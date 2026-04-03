@@ -10,6 +10,14 @@ interface Props {
   initial?: Reference
 }
 
+interface Analysis {
+  language: Language
+  category: Category
+  industry: string | null
+  tags: string[]
+  confidence: 'high' | 'medium' | 'low'
+}
+
 function slugify(text: string) {
   return text
     .toLowerCase()
@@ -39,6 +47,9 @@ export default function ReferenceForm({ initial }: Props) {
   })
 
   const [loading, setLoading] = useState(false)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [analysis, setAnalysis] = useState<Analysis | null>(null)
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   function set(key: string, value: string) {
@@ -54,6 +65,59 @@ export default function ReferenceForm({ initial }: Props) {
       }
       return next
     })
+  }
+
+  async function handleAnalyze() {
+    if (!form.content.trim()) {
+      setAnalyzeError('Cole o texto antes de analisar.')
+      return
+    }
+
+    setAnalyzing(true)
+    setAnalyzeError(null)
+    setAnalysis(null)
+
+    try {
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: form.content }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error ?? 'Erro desconhecido.')
+      }
+
+      const data: Analysis = await res.json()
+      setAnalysis(data)
+    } catch (err) {
+      setAnalyzeError(err instanceof Error ? err.message : 'Falha ao analisar.')
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
+  function applyAnalysis() {
+    if (!analysis) return
+
+    setForm((prev) => {
+      const next = { ...prev }
+
+      if (analysis.language) next.language = analysis.language
+      if (analysis.category) {
+        next.category = analysis.category
+        // Re-generate slug if brand already filled
+        if (!isEditing && prev.brand_name && analysis.category) {
+          next.slug = `${slugify(prev.brand_name)}-${analysis.category}-${Math.random().toString(36).slice(2, 6)}`
+        }
+      }
+      if (analysis.industry) next.industry = analysis.industry
+      if (analysis.tags?.length) next.tags = analysis.tags.join(', ')
+
+      return next
+    })
+    setAnalysis(null)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -165,9 +229,29 @@ export default function ReferenceForm({ initial }: Props) {
         </div>
       </div>
 
-      {/* Content */}
+      {/* Content + Analyze */}
       <div>
-        <label className={labelClass}>Texto da referência *</label>
+        <div className="flex items-center justify-between mb-1.5">
+          <label className={labelClass} style={{ marginBottom: 0 }}>
+            Texto da referência *
+          </label>
+          <button
+            type="button"
+            onClick={handleAnalyze}
+            disabled={analyzing || !form.content.trim()}
+            className="text-2xs uppercase tracking-wider text-muted hover:text-ink border border-border hover:border-border-hover px-3 py-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+          >
+            {analyzing ? (
+              <>
+                <span className="inline-block w-2.5 h-2.5 border border-muted border-t-transparent rounded-full animate-spin" />
+                Analisando...
+              </>
+            ) : (
+              '✦ Analisar com IA'
+            )}
+          </button>
+        </div>
+
         <textarea
           value={form.content}
           onChange={(e) => set('content', e.target.value)}
@@ -176,6 +260,85 @@ export default function ReferenceForm({ initial }: Props) {
           placeholder="Cole o texto aqui..."
           className={`${inputClass} resize-y leading-relaxed`}
         />
+
+        {/* Analysis result card */}
+        {analysis && (
+          <div className="mt-2 border border-border bg-surface p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-2.5 flex-1">
+                <p className="text-2xs text-muted uppercase tracking-widest">
+                  Sugestão da IA
+                  <span
+                    className={`ml-2 ${
+                      analysis.confidence === 'high'
+                        ? 'text-green-600'
+                        : analysis.confidence === 'medium'
+                        ? 'text-amber-600'
+                        : 'text-red-500'
+                    }`}
+                  >
+                    confiança {analysis.confidence === 'high' ? 'alta' : analysis.confidence === 'medium' ? 'média' : 'baixa'}
+                  </span>
+                </p>
+
+                <div className="flex flex-wrap gap-x-6 gap-y-1.5 text-xs">
+                  <span>
+                    <span className="text-muted">Categoria:</span>{' '}
+                    <strong>{CATEGORIES[analysis.category]?.label ?? analysis.category}</strong>
+                  </span>
+                  <span>
+                    <span className="text-muted">Idioma:</span>{' '}
+                    <strong>
+                      {analysis.language === 'pt'
+                        ? 'Português'
+                        : analysis.language === 'en'
+                        ? 'Inglês'
+                        : 'Espanhol'}
+                    </strong>
+                  </span>
+                  {analysis.industry && (
+                    <span>
+                      <span className="text-muted">Setor:</span>{' '}
+                      <strong>{analysis.industry}</strong>
+                    </span>
+                  )}
+                </div>
+
+                {analysis.tags?.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {analysis.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="text-2xs border border-border px-2 py-0.5 text-muted bg-bg"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={applyAnalysis}
+                  className="text-2xs uppercase tracking-wider bg-ink text-bg px-3 py-1.5 hover:bg-ink/80 transition-colors"
+                >
+                  Aplicar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAnalysis(null)}
+                  className="text-2xs uppercase tracking-wider text-muted hover:text-ink transition-colors"
+                >
+                  Ignorar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {analyzeError && <p className="mt-1.5 text-xs text-red-600">{analyzeError}</p>}
       </div>
 
       {/* Title (optional context) */}
