@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { CATEGORIES, LANGUAGES, INDUSTRIES } from '@/lib/constants'
+import ImageUpload from '@/components/ImageUpload'
 import type { Category, Language, Status, Reference } from '@/lib/types'
 
 interface Props {
@@ -18,6 +19,19 @@ interface Analysis {
   confidence: 'high' | 'medium' | 'low'
 }
 
+interface ImportResult {
+  found: boolean
+  reason?: string
+  brand_name?: string
+  title?: string
+  content?: string
+  category?: Category
+  language?: Language
+  industry?: string | null
+  tags?: string[]
+  og_image?: string | null
+}
+
 function slugify(text: string) {
   return text
     .toLowerCase()
@@ -25,6 +39,10 @@ function slugify(text: string) {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '')
+}
+
+function generateSlug(brand: string, category: string) {
+  return `${slugify(brand)}-${category}-${Math.random().toString(36).slice(2, 6)}`
 }
 
 export default function ReferenceForm({ initial }: Props) {
@@ -41,31 +59,104 @@ export default function ReferenceForm({ initial }: Props) {
     year: initial?.year?.toString() ?? '',
     agency: initial?.agency ?? '',
     source_url: initial?.source_url ?? '',
+    image_url: initial?.image_url ?? '',
     tags: initial?.tags?.join(', ') ?? '',
     status: initial?.status ?? ('published' as Status),
     slug: initial?.slug ?? '',
   })
 
-  const [loading, setLoading] = useState(false)
+  // URL import state
+  const [importUrl, setImportUrl] = useState('')
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<ImportResult | null>(null)
+  const [importError, setImportError] = useState<string | null>(null)
+  const [importOpen, setImportOpen] = useState(!isEditing)
+
+  // Analyze state
   const [analyzing, setAnalyzing] = useState(false)
   const [analysis, setAnalysis] = useState<Analysis | null>(null)
   const [analyzeError, setAnalyzeError] = useState<string | null>(null)
+
+  // Submit state
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   function set(key: string, value: string) {
     setForm((prev) => {
       const next = { ...prev, [key]: value }
-      // Auto-generate slug from brand + category on create
       if (!isEditing && (key === 'brand_name' || key === 'category')) {
         const brand = key === 'brand_name' ? value : prev.brand_name
         const cat = key === 'category' ? value : prev.category
-        if (brand && cat) {
-          next.slug = `${slugify(brand)}-${cat}-${Math.random().toString(36).slice(2, 6)}`
-        }
+        if (brand && cat) next.slug = generateSlug(brand, cat)
       }
       return next
     })
   }
+
+  // ── URL Import ────────────────────────────────────────────────────────────
+
+  async function handleImport() {
+    if (!importUrl.trim()) return
+
+    setImporting(true)
+    setImportError(null)
+    setImportResult(null)
+
+    try {
+      const res = await fetch('/api/fetch-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: importUrl.trim() }),
+      })
+
+      const data: ImportResult & { error?: string } = await res.json()
+
+      if (!res.ok || data.error) {
+        setImportError(data.error ?? 'Erro ao importar URL.')
+        return
+      }
+
+      if (!data.found) {
+        setImportError(data.reason ?? 'Nenhuma referência encontrada nessa página.')
+        return
+      }
+
+      setImportResult(data)
+    } catch {
+      setImportError('Erro de conexão ao importar.')
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  function applyImport() {
+    if (!importResult) return
+
+    setForm((prev) => {
+      const next = { ...prev }
+      if (importResult.brand_name) next.brand_name = importResult.brand_name
+      if (importResult.title) next.title = importResult.title
+      if (importResult.content) next.content = importResult.content
+      if (importResult.category) next.category = importResult.category
+      if (importResult.language) next.language = importResult.language
+      if (importResult.industry) next.industry = importResult.industry
+      if (importResult.tags?.length) next.tags = importResult.tags.join(', ')
+      if (importResult.og_image) next.image_url = importResult.og_image
+      if (!prev.source_url && importUrl) next.source_url = importUrl
+
+      // Re-generate slug
+      const brand = importResult.brand_name ?? prev.brand_name
+      const cat = importResult.category ?? prev.category
+      if (!isEditing && brand && cat) next.slug = generateSlug(brand, cat)
+
+      return next
+    })
+
+    setImportResult(null)
+    setImportOpen(false)
+  }
+
+  // ── Analyze text ──────────────────────────────────────────────────────────
 
   async function handleAnalyze() {
     if (!form.content.trim()) {
@@ -84,15 +175,16 @@ export default function ReferenceForm({ initial }: Props) {
         body: JSON.stringify({ content: form.content }),
       })
 
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error ?? 'Erro desconhecido.')
+      const data: Analysis & { error?: string } = await res.json()
+
+      if (!res.ok || data.error) {
+        setAnalyzeError(data.error ?? 'Erro ao analisar.')
+        return
       }
 
-      const data: Analysis = await res.json()
       setAnalysis(data)
-    } catch (err) {
-      setAnalyzeError(err instanceof Error ? err.message : 'Falha ao analisar.')
+    } catch {
+      setAnalyzeError('Erro de conexão.')
     } finally {
       setAnalyzing(false)
     }
@@ -103,22 +195,21 @@ export default function ReferenceForm({ initial }: Props) {
 
     setForm((prev) => {
       const next = { ...prev }
-
       if (analysis.language) next.language = analysis.language
       if (analysis.category) {
         next.category = analysis.category
-        // Re-generate slug if brand already filled
-        if (!isEditing && prev.brand_name && analysis.category) {
-          next.slug = `${slugify(prev.brand_name)}-${analysis.category}-${Math.random().toString(36).slice(2, 6)}`
-        }
+        if (!isEditing && prev.brand_name)
+          next.slug = generateSlug(prev.brand_name, analysis.category)
       }
       if (analysis.industry) next.industry = analysis.industry
       if (analysis.tags?.length) next.tags = analysis.tags.join(', ')
-
       return next
     })
+
     setAnalysis(null)
   }
+
+  // ── Submit ────────────────────────────────────────────────────────────────
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -135,6 +226,7 @@ export default function ReferenceForm({ initial }: Props) {
       year: form.year ? parseInt(form.year) : null,
       agency: form.agency || null,
       source_url: form.source_url || null,
+      image_url: form.image_url || null,
       tags: form.tags
         ? form.tags
             .split(',')
@@ -178,8 +270,148 @@ export default function ReferenceForm({ initial }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 max-w-[720px]">
+
+      {/* ── URL Import panel ─────────────────────────────────────────────── */}
+      <div className="border border-border">
+        <button
+          type="button"
+          onClick={() => setImportOpen((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 text-xs uppercase tracking-wider text-muted hover:text-ink transition-colors"
+        >
+          <span>✦ Importar de URL</span>
+          <span className="text-faint">{importOpen ? '↑' : '↓'}</span>
+        </button>
+
+        {importOpen && (
+          <div className="border-t border-border px-4 py-4 space-y-3">
+            <p className="text-xs text-muted leading-relaxed">
+              Cole a URL de uma página (D&AD, Cannes, site de agência, marca...) e o sistema extrai
+              o conteúdo e preenche o formulário automaticamente.
+            </p>
+
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={importUrl}
+                onChange={(e) => setImportUrl(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleImport())}
+                placeholder="https://"
+                className={`${inputClass} flex-1`}
+              />
+              <button
+                type="button"
+                onClick={handleImport}
+                disabled={importing || !importUrl.trim()}
+                className="text-2xs uppercase tracking-wider bg-ink text-bg px-4 py-2 hover:bg-ink/80 transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap flex items-center gap-1.5"
+              >
+                {importing ? (
+                  <>
+                    <span className="inline-block w-2.5 h-2.5 border border-bg border-t-transparent rounded-full animate-spin" />
+                    Buscando...
+                  </>
+                ) : (
+                  'Importar'
+                )}
+              </button>
+            </div>
+
+            {importError && <p className="text-xs text-red-600">{importError}</p>}
+
+            {/* Import result preview */}
+            {importResult && importResult.found && (
+              <div className="border border-border bg-surface p-4 space-y-3">
+                <p className="text-2xs text-muted uppercase tracking-widest">
+                  Encontrado — revise antes de aplicar
+                </p>
+
+                <div className="space-y-1.5 text-xs">
+                  {importResult.brand_name && (
+                    <div>
+                      <span className="text-muted">Marca: </span>
+                      <strong>{importResult.brand_name}</strong>
+                    </div>
+                  )}
+                  {importResult.category && (
+                    <div>
+                      <span className="text-muted">Categoria: </span>
+                      <strong>{CATEGORIES[importResult.category]?.label}</strong>
+                      {importResult.language && (
+                        <>
+                          <span className="text-faint mx-2">·</span>
+                          <span className="text-muted">Idioma: </span>
+                          <strong>
+                            {importResult.language === 'pt'
+                              ? 'Português'
+                              : importResult.language === 'en'
+                              ? 'Inglês'
+                              : 'Espanhol'}
+                          </strong>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {importResult.title && (
+                    <div>
+                      <span className="text-muted">Título: </span>
+                      {importResult.title}
+                    </div>
+                  )}
+                </div>
+
+                {importResult.content && (
+                  <p className="text-sm text-ink leading-relaxed line-clamp-4 border-l-2 border-ink pl-3 whitespace-pre-line">
+                    {importResult.content}
+                  </p>
+                )}
+
+                {importResult.og_image && (
+                  <div className="w-full h-28 border border-border overflow-hidden bg-bg">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={importResult.og_image}
+                      alt="og:image"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+
+                {importResult.tags && importResult.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {importResult.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="text-2xs border border-border px-2 py-0.5 text-muted bg-bg"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={applyImport}
+                    className="text-2xs uppercase tracking-wider bg-ink text-bg px-4 py-1.5 hover:bg-ink/80 transition-colors"
+                  >
+                    Aplicar tudo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setImportResult(null)}
+                    className="text-2xs uppercase tracking-wider text-muted hover:text-ink transition-colors"
+                  >
+                    Ignorar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Main fields ──────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-        {/* Brand */}
         <div className="sm:col-span-2">
           <label className={labelClass}>Marca *</label>
           <input
@@ -192,7 +424,6 @@ export default function ReferenceForm({ initial }: Props) {
           />
         </div>
 
-        {/* Category */}
         <div>
           <label className={labelClass}>Categoria *</label>
           <select
@@ -210,7 +441,6 @@ export default function ReferenceForm({ initial }: Props) {
           </select>
         </div>
 
-        {/* Language */}
         <div>
           <label className={labelClass}>Idioma *</label>
           <select
@@ -277,10 +507,14 @@ export default function ReferenceForm({ initial }: Props) {
                         : 'text-red-500'
                     }`}
                   >
-                    confiança {analysis.confidence === 'high' ? 'alta' : analysis.confidence === 'medium' ? 'média' : 'baixa'}
+                    confiança{' '}
+                    {analysis.confidence === 'high'
+                      ? 'alta'
+                      : analysis.confidence === 'medium'
+                      ? 'média'
+                      : 'baixa'}
                   </span>
                 </p>
-
                 <div className="flex flex-wrap gap-x-6 gap-y-1.5 text-xs">
                   <span>
                     <span className="text-muted">Categoria:</span>{' '}
@@ -303,7 +537,6 @@ export default function ReferenceForm({ initial }: Props) {
                     </span>
                   )}
                 </div>
-
                 {analysis.tags?.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
                     {analysis.tags.map((tag) => (
@@ -317,7 +550,6 @@ export default function ReferenceForm({ initial }: Props) {
                   </div>
                 )}
               </div>
-
               <div className="flex flex-col gap-2 shrink-0">
                 <button
                   type="button"
@@ -341,7 +573,7 @@ export default function ReferenceForm({ initial }: Props) {
         {analyzeError && <p className="mt-1.5 text-xs text-red-600">{analyzeError}</p>}
       </div>
 
-      {/* Title (optional context) */}
+      {/* Title */}
       <div>
         <label className={labelClass}>Título / contexto (opcional)</label>
         <input
@@ -354,7 +586,6 @@ export default function ReferenceForm({ initial }: Props) {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        {/* Industry */}
         <div>
           <label className={labelClass}>Setor</label>
           <select
@@ -371,7 +602,6 @@ export default function ReferenceForm({ initial }: Props) {
           </select>
         </div>
 
-        {/* Year */}
         <div>
           <label className={labelClass}>Ano</label>
           <input
@@ -385,7 +615,6 @@ export default function ReferenceForm({ initial }: Props) {
           />
         </div>
 
-        {/* Status */}
         <div>
           <label className={labelClass}>Status</label>
           <select
@@ -400,7 +629,6 @@ export default function ReferenceForm({ initial }: Props) {
         </div>
       </div>
 
-      {/* Agency */}
       <div>
         <label className={labelClass}>Agência / Autor</label>
         <input
@@ -412,7 +640,6 @@ export default function ReferenceForm({ initial }: Props) {
         />
       </div>
 
-      {/* Tags */}
       <div>
         <label className={labelClass}>Tags (separadas por vírgula)</label>
         <input
@@ -424,7 +651,6 @@ export default function ReferenceForm({ initial }: Props) {
         />
       </div>
 
-      {/* Source */}
       <div>
         <label className={labelClass}>URL da fonte</label>
         <input
@@ -436,9 +662,18 @@ export default function ReferenceForm({ initial }: Props) {
         />
       </div>
 
-      {/* Slug */}
+      {/* ── Image ────────────────────────────────────────────────────────── */}
       <div>
-        <label className={labelClass}>Slug (gerado automaticamente)</label>
+        <label className={labelClass}>Imagem</label>
+        <ImageUpload
+          value={form.image_url}
+          onChange={(url) => setForm((prev) => ({ ...prev, image_url: url }))}
+          sourceUrl={form.source_url}
+        />
+      </div>
+
+      <div>
+        <label className={labelClass}>Slug</label>
         <input
           type="text"
           value={form.slug}

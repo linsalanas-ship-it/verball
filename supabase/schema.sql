@@ -8,6 +8,7 @@ create table if not exists public.references (
   content text not null,
   brand_name text not null,
   brand_logo_url text,
+  image_url text,
   category text not null check (
     category in ('manifesto', 'tom-de-voz', 'tagline', 'redacao', 'email', 'naming', 'ooh')
   ),
@@ -61,3 +62,9 @@ create policy "Authenticated users have full access"
   on public.references for all
   using (auth.uid() is not null)
   with check (auth.uid() is not null);
+
+-- Migration: run this if the table already exists
+-- alter table public.references add column if not exists image_url text;
+
+-- Supabase Storage: create a public bucket named "reference-images"
+-- Go to Storage → New bucket → name: reference-images → Public: ON

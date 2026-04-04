@@ -18,6 +18,7 @@ export interface Reference {
   content: string
   brand_name: string
   brand_logo_url: string | null
+  image_url: string | null
   category: Category
   language: Language
   industry: string | null

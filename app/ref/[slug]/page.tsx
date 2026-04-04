@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const supabase = createClient()
   const { data } = await supabase
     .from('references')
-    .select('brand_name, content, category')
+    .select('brand_name, content, category, image_url')
     .eq('slug', params.slug)
     .eq('status', 'published')
     .single()
@@ -26,6 +26,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `${data.brand_name} — Verball`,
     description: excerpt,
+    openGraph: {
+      title: `${data.brand_name} — Verball`,
+      description: excerpt,
+      ...(data.image_url ? { images: [{ url: data.image_url }] } : {}),
+    },
   }
 }
 
@@ -56,6 +61,18 @@ export default async function ReferencePage({ params }: Props) {
           <span>←</span>
           <span>Voltar</span>
         </Link>
+
+        {/* Hero image */}
+        {reference.image_url && (
+          <div className="w-full h-56 sm:h-72 border border-border overflow-hidden mb-10">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={reference.image_url}
+              alt={`${reference.brand_name} — ${CATEGORIES[reference.category].label}`}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        )}
 
         {/* Brand + Meta */}
         <div className="flex items-start justify-between gap-4 mb-10">
