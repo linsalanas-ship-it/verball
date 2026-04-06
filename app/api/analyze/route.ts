@@ -19,7 +19,6 @@ export async function POST(request: NextRequest) {
     const response = await client.messages.create({
       model: 'claude-opus-4-6',
       max_tokens: 1024,
-      
       system: `Você é um especialista em branding verbal, redação publicitária e comunicação de marca.
 Analise o texto fornecido e retorne um JSON com as seguintes inferências.
 
@@ -57,12 +56,25 @@ Para tags: use termos descritivos relevantes ao tom, tema ou técnica do texto (
     }
 
     // Parse JSON — Claude may wrap in ```json blocks
-    const raw = textBlock.text.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim()
+    const raw = textBlock.text
+      .replace(/^```json\s*/i, '')
+      .replace(/```\s*$/, '')
+      .trim()
     const analysis = JSON.parse(raw)
 
     return NextResponse.json(analysis)
   } catch (error) {
-    console.error('[analyze]', error)
-    return NextResponse.json({ error: 'Falha ao analisar texto.' }, { status: 500 })
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('[analyze]', message)
+
+    // Surface auth errors clearly
+    if (message.includes('401') || message.includes('authentication') || message.includes('API key')) {
+      return NextResponse.json(
+        { error: 'ANTHROPIC_API_KEY não configurada ou inválida.' },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({ error: `Falha ao analisar: ${message}` }, { status: 500 })
   }
 }
