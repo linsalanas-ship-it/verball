@@ -111,7 +111,6 @@ export async function POST(request: NextRequest) {
     const response = await client.messages.create({
       model: 'claude-opus-4-6',
       max_tokens: 1024,
-      thinking: { type: 'adaptive' },
       system: `Você é um especialista em branding verbal e redação publicitária.
 Analise o conteúdo de uma página web e extraia a melhor referência verbal de branding presente nela.
 
