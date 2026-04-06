@@ -109,15 +109,22 @@ export default function ReferenceForm({ initial }: Props) {
         body: JSON.stringify({ url: importUrl.trim() }),
       })
 
-      const data: ImportResult & { error?: string } = await res.json()
+      const data: ImportResult & { error?: string; js_rendered?: boolean; og_title?: string } =
+        await res.json()
 
-      if (!res.ok || data.error) {
-        setImportError(data.error ?? 'Erro ao importar URL.')
-        return
-      }
-
-      if (!data.found) {
-        setImportError(data.reason ?? 'Nenhuma referência encontrada nessa página.')
+      if (data.error) {
+        // JS-rendered page: offer to pre-fill source_url and og_image at least
+        if (data.js_rendered) {
+          setImportError(data.error)
+          // Still apply what we could get (og_image, source_url)
+          setForm((prev) => ({
+            ...prev,
+            source_url: prev.source_url || importUrl.trim(),
+            image_url: prev.image_url || (data.og_image ?? ''),
+          }))
+          return
+        }
+        setImportError(data.error)
         return
       }
 

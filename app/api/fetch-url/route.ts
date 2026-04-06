@@ -44,6 +44,29 @@ function stripHtml(html: string): string {
     .trim()
 }
 
+function parseClaudeJson(text: string): Record<string, unknown> | null {
+  // Try direct parse first
+  try {
+    return JSON.parse(text)
+  } catch {}
+
+  // Strip markdown code fences
+  const stripped = text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim()
+  try {
+    return JSON.parse(stripped)
+  } catch {}
+
+  // Extract first {...} block
+  const match = stripped.match(/\{[\s\S]*\}/)
+  if (match) {
+    try {
+      return JSON.parse(match[0])
+    } catch {}
+  }
+
+  return null
+}
+
 export async function POST(request: NextRequest) {
   let url: string
   try {
@@ -66,9 +89,10 @@ export async function POST(request: NextRequest) {
     const res = await fetch(url, {
       signal: controller.signal,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; Verball/1.0; +https://verball.app)',
+        'User-Agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,es;q=0.7',
+        'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
       },
     })
     clearTimeout(timeout)
@@ -93,22 +117,30 @@ export async function POST(request: NextRequest) {
 
   // Extract metadata
   const ogImage = extractMeta(html, 'og:image', 'twitter:image')
-  const ogTitle =
-    extractMeta(html, 'og:title', 'twitter:title') ?? extractTitle(html)
-  const ogDescription = extractMeta(
-    html,
-    'og:description',
-    'twitter:description',
-    'description'
-  )
+  const ogTitle = extractMeta(html, 'og:title', 'twitter:title') ?? extractTitle(html)
+  const ogDescription = extractMeta(html, 'og:description', 'twitter:description', 'description')
 
-  // Clean text (limit to avoid token overflow)
+  // Clean text
   const textContent = stripHtml(html).slice(0, 6000)
 
+  // Detect JS-rendered pages (very little text = SPA shell)
+  if (textContent.length < 200) {
+    return NextResponse.json(
+      {
+        error:
+          'Esta página carrega conteúdo via JavaScript e não pode ser lida automaticamente. Tente copiar o texto manualmente e usar o botão "Analisar com IA".',
+        js_rendered: true,
+        og_image: ogImage,
+        og_title: ogTitle,
+      },
+      { status: 422 }
+    )
+  }
+
   // Analyze with Claude
-  let claudeResult: Record<string, unknown>
+  let response
   try {
-    const response = await client.messages.create({
+    response = await client.messages.create({
       model: 'claude-opus-4-6',
       max_tokens: 1024,
       system: `Você é um especialista em branding verbal e redação publicitária.
@@ -149,22 +181,37 @@ ${textContent}`,
         },
       ],
     })
-
-    const textBlock = response.content.find((b) => b.type === 'text')
-    if (!textBlock || textBlock.type !== 'text') throw new Error('Sem texto na resposta.')
-
-    const raw = textBlock.text
-      .replace(/^```json\s*/i, '')
-      .replace(/```\s*$/, '')
-      .trim()
-
-    claudeResult = JSON.parse(raw)
-  } catch {
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Erro desconhecido'
     return NextResponse.json(
-      { error: 'Erro ao analisar o conteúdo da página.' },
+      { error: `Erro ao chamar Claude API: ${msg}` },
       { status: 500 }
     )
   }
 
-  return NextResponse.json({ ...claudeResult, og_image: ogImage })
+  const textBlock = response.content.find((b) => b.type === 'text')
+  if (!textBlock || textBlock.type !== 'text') {
+    return NextResponse.json({ error: 'Resposta inesperada do modelo.' }, { status: 500 })
+  }
+
+  const parsed = parseClaudeJson(textBlock.text)
+  if (!parsed) {
+    return NextResponse.json(
+      { error: 'Não foi possível interpretar a resposta do modelo.' },
+      { status: 500 }
+    )
+  }
+
+  if (!parsed.found) {
+    return NextResponse.json(
+      {
+        error:
+          (parsed.reason as string) ||
+          'Nenhuma referência verbal de branding encontrada nessa página.',
+      },
+      { status: 422 }
+    )
+  }
+
+  return NextResponse.json({ ...parsed, og_image: ogImage })
 }
