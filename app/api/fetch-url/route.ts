@@ -163,9 +163,9 @@ Se a página não contiver referência verbal relevante de branding, retorne:
 
 Categorias:
 - manifesto: texto longo de posicionamento e propósito de marca
-- tom-de-voz: princípios ou diretrizes de linguagem e comunicação
-- tagline: slogan ou assinatura curta (até ~10 palavras)
-- redacao: copy publicitário, headline, body copy de campanha
+- identidade-verbal: princípios ou diretrizes de linguagem e tom de voz
+- copywriting: copy publicitário, headline, body copy, slogan ou tagline de campanha
+- poesia: texto com estrutura poética, lírica, verso ou linguagem literária
 - email: email marketing ou newsletter
 - naming: nome de marca, produto ou sistema de nomenclatura
 - ooh: copy para mídia offline, outdoor, TV, rádio`,

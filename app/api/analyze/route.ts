@@ -33,9 +33,9 @@ Responda APENAS com JSON válido, sem texto antes ou depois. Formato exato:
 
 Definições de categoria:
 - manifesto: texto longo de posicionamento e propósito de marca
-- tom-de-voz: princípios, regras ou diretrizes de linguagem
-- tagline: slogan ou assinatura curta (geralmente até 10 palavras)
-- redacao: copy publicitário, headline, body copy de campanha
+- identidade-verbal: princípios, regras ou diretrizes de linguagem e tom de voz
+- copywriting: copy publicitário, headline, body copy, slogan ou tagline de campanha
+- poesia: texto com estrutura poética, lírica, verso ou linguagem literária
 - email: texto de email marketing, newsletter, sequência de onboarding
 - naming: nome de marca, produto, serviço ou sistema de nomenclatura
 - ooh: copy para peças offline, outdoor, mídia impressa, rádio, TV
@@ -49,13 +49,11 @@ Para tags: use termos descritivos relevantes ao tom, tema ou técnica do texto (
       ],
     })
 
-    // Extract text block (skip thinking blocks)
     const textBlock = response.content.find((b) => b.type === 'text')
     if (!textBlock || textBlock.type !== 'text') {
       throw new Error('Sem resposta de texto do modelo.')
     }
 
-    // Parse JSON — Claude may wrap in ```json blocks
     const raw = textBlock.text
       .replace(/^```json\s*/i, '')
       .replace(/```\s*$/, '')
@@ -67,7 +65,6 @@ Para tags: use termos descritivos relevantes ao tom, tema ou técnica do texto (
     const message = error instanceof Error ? error.message : String(error)
     console.error('[analyze]', message)
 
-    // Surface auth errors clearly
     if (message.includes('401') || message.includes('authentication') || message.includes('API key')) {
       return NextResponse.json(
         { error: 'ANTHROPIC_API_KEY não configurada ou inválida.' },

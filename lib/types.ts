@@ -1,8 +1,8 @@
 export type Category =
   | 'manifesto'
-  | 'tom-de-voz'
-  | 'tagline'
-  | 'redacao'
+  | 'identidade-verbal'
+  | 'copywriting'
+  | 'poesia'
   | 'email'
   | 'naming'
   | 'ooh'
@@ -29,6 +29,14 @@ export interface Reference {
   status: Status
   created_at: string
   updated_at: string
+}
+
+export interface ReferenceImage {
+  id: string
+  reference_id: string
+  image_url: string
+  position: number
+  created_at: string
 }
 
 export type ReferenceInsert = Omit<Reference, 'id' | 'created_at' | 'updated_at'>
