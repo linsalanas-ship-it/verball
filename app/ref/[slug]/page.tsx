@@ -3,6 +3,7 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import Header from '@/components/Header'
+import ImageLightbox from '@/components/ImageLightbox'
 import { CATEGORIES, LANGUAGES } from '@/lib/constants'
 import type { Reference, ReferenceImage } from '@/lib/types'
 
@@ -93,50 +94,7 @@ export default async function ReferencePage({ params }: Props) {
         {/* Image gallery */}
         {displayImages.length > 0 && (
           <div className="mb-10">
-            {displayImages.length === 1 ? (
-              <div className="w-full border border-border overflow-hidden" style={{ maxHeight: '480px' }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={displayImages[0]}
-                  alt={reference.brand_name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            ) : (
-              <div className="grid gap-1.5" style={{ gridTemplateColumns: displayImages.length >= 3 ? '2fr 1fr' : '1fr 1fr' }}>
-                {/* First image — large */}
-                <div
-                  className="border border-border overflow-hidden"
-                  style={{ gridRow: displayImages.length > 2 ? 'span 2' : 'span 1', maxHeight: '400px' }}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={displayImages[0]}
-                    alt={reference.brand_name}
-                    className="w-full h-full object-cover"
-                    style={{ height: '100%', minHeight: '200px' }}
-                  />
-                </div>
-                {/* Remaining images */}
-                {displayImages.slice(1, displayImages.length >= 3 ? 3 : 2).map((url, i) => (
-                  <div key={url + i} className="border border-border overflow-hidden" style={{ height: '195px' }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={url} alt="" className="w-full h-full object-cover" />
-                  </div>
-                ))}
-                {/* Extra images below */}
-                {displayImages.length > 3 && (
-                  <div className="col-span-full grid grid-cols-3 gap-1.5 mt-0">
-                    {displayImages.slice(3).map((url, i) => (
-                      <div key={url + i} className="border border-border overflow-hidden" style={{ height: '160px' }}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={url} alt="" className="w-full h-full object-cover" />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+            <ImageLightbox images={displayImages} altBase={reference.brand_name} />
           </div>
         )}
 

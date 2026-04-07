@@ -53,7 +53,7 @@ function Hero({ reference }: { reference: Reference }) {
                 {category.label}
               </span>
 
-              <h2 className="font-serif text-[40px] lg:text-[52px] xl:text-[60px] font-normal leading-[1.05] tracking-tight mb-7">
+              <h2 className="text-[40px] lg:text-[52px] xl:text-[60px] font-semibold leading-[1.05] tracking-tight mb-7">
                 {reference.brand_name}
               </h2>
 
@@ -98,7 +98,7 @@ function Hero({ reference }: { reference: Reference }) {
             {category.label}
           </span>
 
-          <h2 className="font-serif text-[52px] sm:text-[68px] lg:text-[84px] font-normal leading-[1.0] tracking-tight mb-8 max-w-[860px]">
+          <h2 className="text-[52px] sm:text-[68px] lg:text-[84px] font-semibold leading-[1.0] tracking-tight mb-8 max-w-[860px]">
             {reference.brand_name}
           </h2>
 
