@@ -12,9 +12,9 @@ export default function FilterBar() {
   const activeCategory = params.get('categoria') as Category | null
   const activeLanguage = params.get('idioma') as Language | null
 
-  function setParam(key: string, value: string | null) {
+  function setParam(key: string, value: string) {
     const next = new URLSearchParams(params.toString())
-    if (value === null || next.get(key) === value) {
+    if (next.get(key) === value) {
       next.delete(key)
     } else {
       next.set(key, value)
@@ -22,68 +22,66 @@ export default function FilterBar() {
     router.push(`${pathname}?${next.toString()}`, { scroll: false })
   }
 
+  const hasActive = activeCategory || activeLanguage
+
   return (
-    <div className="border-b border-border sticky top-11 bg-bg z-30">
-      <div className="max-w-[1400px] mx-auto px-5">
-        <div className="flex items-center gap-6 py-2.5 overflow-x-auto scrollbar-none">
-          {/* Category filters */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            {(Object.entries(CATEGORIES) as [Category, (typeof CATEGORIES)[Category]][]).map(
-              ([key, cat]) => (
-                <button
-                  key={key}
-                  onClick={() => setParam('categoria', key)}
-                  className={`text-2xs uppercase tracking-[0.06em] px-2.5 py-1 rounded-sm border transition-colors duration-100 whitespace-nowrap ${
-                    activeCategory === key
-                      ? 'border-ink bg-ink text-bg'
-                      : 'border-border text-muted hover:border-border-hover hover:text-ink'
-                  }`}
-                >
-                  {cat.label}
-                </button>
-              )
-            )}
-          </div>
+    <div className="flex items-center gap-1 flex-wrap">
+      {/* Categories */}
+      {(Object.entries(CATEGORIES) as [Category, (typeof CATEGORIES)[Category]][]).map(
+        ([key, cat]) => (
+          <button
+            key={key}
+            onClick={() => setParam('categoria', key)}
+            className={`text-2xs px-2 py-1 transition-colors duration-100 whitespace-nowrap rounded-sm ${
+              activeCategory === key
+                ? 'text-bg'
+                : 'text-muted hover:text-ink'
+            }`}
+            style={
+              activeCategory === key
+                ? { backgroundColor: cat.color }
+                : undefined
+            }
+          >
+            {cat.label}
+          </button>
+        )
+      )}
 
-          {/* Divider */}
-          <div className="w-px h-4 bg-border shrink-0" />
+      <span className="text-faint text-2xs px-1">|</span>
 
-          {/* Language filters */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            {(Object.entries(LANGUAGES) as [Language, (typeof LANGUAGES)[Language]][]).map(
-              ([key, lang]) => (
-                <button
-                  key={key}
-                  onClick={() => setParam('idioma', key)}
-                  className={`text-2xs font-semibold uppercase tracking-widest px-2.5 py-1 rounded-sm border transition-colors duration-100 ${
-                    activeLanguage === key
-                      ? 'border-ink bg-ink text-bg'
-                      : 'border-border hover:border-border-hover'
-                  }`}
-                  style={
-                    activeLanguage !== key ? { color: lang.color } : undefined
-                  }
-                >
-                  {lang.label}
-                </button>
-              )
-            )}
-          </div>
+      {/* Languages */}
+      {(Object.entries(LANGUAGES) as [Language, (typeof LANGUAGES)[Language]][]).map(
+        ([key, lang]) => (
+          <button
+            key={key}
+            onClick={() => setParam('idioma', key)}
+            className={`text-2xs font-semibold px-2 py-1 transition-colors duration-100 rounded-sm ${
+              activeLanguage === key ? 'text-bg' : 'text-muted hover:text-ink'
+            }`}
+            style={
+              activeLanguage === key
+                ? { backgroundColor: lang.color }
+                : { color: lang.color }
+            }
+          >
+            {lang.label}
+          </button>
+        )
+      )}
 
-          {/* Clear */}
-          {(activeCategory || activeLanguage) && (
-            <>
-              <div className="w-px h-4 bg-border shrink-0" />
-              <button
-                onClick={() => router.push(pathname, { scroll: false })}
-                className="text-2xs text-muted hover:text-ink uppercase tracking-wider transition-colors shrink-0"
-              >
-                Limpar
-              </button>
-            </>
-          )}
-        </div>
-      </div>
+      {/* Clear */}
+      {hasActive && (
+        <>
+          <span className="text-faint text-2xs px-1">|</span>
+          <button
+            onClick={() => router.push(pathname, { scroll: false })}
+            className="text-2xs text-faint hover:text-muted transition-colors"
+          >
+            Limpar
+          </button>
+        </>
+      )}
     </div>
   )
 }

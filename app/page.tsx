@@ -3,7 +3,6 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import Header from '@/components/Header'
 import FilterBar from '@/components/FilterBar'
-import ReferenceCard from '@/components/ReferenceCard'
 import { CATEGORIES, LANGUAGES } from '@/lib/constants'
 import type { Category, Language, Reference } from '@/lib/types'
 
@@ -13,107 +12,251 @@ interface SearchParams {
   q?: string
 }
 
-// ── Hero (latest reference) ────────────────────────────────────────────────
+// ── Hero ──────────────────────────────────────────────────────────────────
 
-function HeroReference({ reference }: { reference: Reference }) {
+function Hero({ reference }: { reference: Reference }) {
   const category = CATEGORIES[reference.category]
   const language = LANGUAGES[reference.language]
+  const excerpt =
+    reference.content.length > 280
+      ? reference.content.slice(0, 280).trimEnd() + '…'
+      : reference.content
 
   return (
     <Link
       href={`/ref/${reference.slug}`}
-      className="group block border-b border-border hover:bg-surface transition-colors duration-150"
+      className="group block border-b border-border"
     >
-      {/* Hero image */}
-      {reference.image_url && (
-        <div className="w-full overflow-hidden border-b border-border" style={{ height: 'clamp(240px, 45vw, 520px)' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+      {reference.image_url ? (
+        /* ── With image: two-column ── */
+        <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr]">
+          {/* Image */}
+          <div
+            className="overflow-hidden border-b lg:border-b-0 lg:border-r border-border"
+            style={{ height: 'clamp(260px, 48vw, 580px)' }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={reference.image_url}
+              alt={reference.brand_name}
+              className="w-full h-full object-cover group-hover:scale-[1.015] transition-transform duration-700 ease-out"
+            />
+          </div>
+
+          {/* Text */}
+          <div className="flex flex-col justify-between px-7 py-8 lg:px-10 lg:py-12">
+            <div>
+              <span
+                className="inline-block text-2xs uppercase tracking-widest font-medium px-2 py-1 rounded-sm mb-7"
+                style={{ color: category.color, backgroundColor: category.bg }}
+              >
+                {category.label}
+              </span>
+
+              <h2 className="font-serif text-[40px] lg:text-[52px] xl:text-[60px] font-normal leading-[1.05] tracking-tight mb-7">
+                {reference.brand_name}
+              </h2>
+
+              <p className="text-[15px] leading-[1.65] text-ink/75 line-clamp-5">
+                {excerpt}
+              </p>
+            </div>
+
+            <div className="mt-8">
+              <span className="text-xs uppercase tracking-widest group-hover:underline underline-offset-4 decoration-1">
+                Ler referência completa →
+              </span>
+              <div className="mt-4 flex items-center gap-2.5 text-2xs text-muted">
+                {reference.year && <span>{reference.year}</span>}
+                {reference.year && <span className="text-faint">·</span>}
+                <span className="font-semibold" style={{ color: language.color }}>
+                  {language.label}
+                </span>
+                {reference.industry && (
+                  <>
+                    <span className="text-faint">·</span>
+                    <span>{reference.industry}</span>
+                  </>
+                )}
+                {reference.agency && (
+                  <>
+                    <span className="text-faint">·</span>
+                    <span className="truncate">{reference.agency}</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* ── No image: typographic hero ── */
+        <div className="max-w-[1400px] mx-auto px-5 py-14 lg:py-20">
+          <span
+            className="inline-block text-2xs uppercase tracking-widest font-medium px-2 py-1 rounded-sm mb-8"
+            style={{ color: category.color, backgroundColor: category.bg }}
+          >
+            {category.label}
+          </span>
+
+          <h2 className="font-serif text-[52px] sm:text-[68px] lg:text-[84px] font-normal leading-[1.0] tracking-tight mb-8 max-w-[860px]">
+            {reference.brand_name}
+          </h2>
+
+          <p className="text-[17px] lg:text-[19px] leading-[1.65] text-ink/75 max-w-[640px] line-clamp-4">
+            {excerpt}
+          </p>
+
+          <div className="mt-10 flex flex-wrap items-center gap-6">
+            <span className="text-xs uppercase tracking-widest group-hover:underline underline-offset-4 decoration-1">
+              Ler referência completa →
+            </span>
+            <div className="flex items-center gap-2.5 text-2xs text-muted">
+              {reference.year && <span>{reference.year}</span>}
+              {reference.year && <span className="text-faint">·</span>}
+              <span className="font-semibold" style={{ color: language.color }}>
+                {language.label}
+              </span>
+              {reference.industry && (
+                <>
+                  <span className="text-faint">·</span>
+                  <span>{reference.industry}</span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </Link>
+  )
+}
+
+// ── Archive card ──────────────────────────────────────────────────────────
+
+function ArchiveCard({ reference }: { reference: Reference }) {
+  const category = CATEGORIES[reference.category]
+  const language = LANGUAGES[reference.language]
+
+  return (
+    <Link href={`/ref/${reference.slug}`} className="group block">
+      {/* Image / placeholder */}
+      <div className="overflow-hidden border border-border mb-3 bg-surface" style={{ aspectRatio: '4/3' }}>
+        {reference.image_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={reference.image_url}
             alt={reference.brand_name}
-            className="w-full h-full object-cover group-hover:scale-[1.01] transition-transform duration-500"
+            className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500 ease-out"
           />
-        </div>
-      )}
-
-      <div className="max-w-[1400px] mx-auto px-5 py-10 sm:py-14">
-        {/* Top row */}
-        <div className="flex items-start justify-between gap-4 mb-6">
-          <span className="text-xs font-semibold uppercase tracking-[0.1em]">
-            {reference.brand_name}
-          </span>
-          <div className="flex items-center gap-3 shrink-0">
+        ) : (
+          /* Fallback: category-tinted panel with brand initial */
+          <div
+            className="w-full h-full flex flex-col justify-between p-4"
+            style={{ backgroundColor: category.bg }}
+          >
             <span
-              className="text-2xs uppercase tracking-[0.08em] font-medium px-2.5 py-1 rounded-sm"
-              style={{ color: category.color, backgroundColor: category.bg }}
+              className="text-[56px] font-serif font-normal leading-none"
+              style={{ color: category.color, opacity: 0.25 }}
+            >
+              {reference.brand_name.charAt(0)}
+            </span>
+            <span
+              className="text-2xs uppercase tracking-widest font-medium"
+              style={{ color: category.color }}
             >
               {category.label}
             </span>
-            <span
-              className="text-2xs font-semibold uppercase tracking-wider"
-              style={{ color: language.color }}
-            >
-              {language.label}
-            </span>
           </div>
+        )}
+      </div>
+
+      {/* Meta */}
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-2">
+          <span
+            className="text-2xs uppercase tracking-[0.06em] font-medium px-1.5 py-0.5 rounded-sm"
+            style={{ color: category.color, backgroundColor: category.bg }}
+          >
+            {category.label}
+          </span>
         </div>
-
-        {/* Text — the hero */}
-        <p
-          className="text-[22px] sm:text-[28px] leading-[1.55] text-ink whitespace-pre-line"
-          style={{ maxWidth: '860px' }}
-        >
-          {reference.content.length > 320
-            ? reference.content.slice(0, 320).trimEnd() + '…'
-            : reference.content}
-        </p>
-
-        {/* Meta */}
-        <div className="mt-8 flex items-center gap-2 text-2xs text-muted">
+        <p className="text-sm font-semibold tracking-tight leading-tight">{reference.brand_name}</p>
+        <p className="text-xs text-muted leading-relaxed line-clamp-2">{reference.content}</p>
+        <div className="flex items-center gap-2 text-2xs text-faint pt-0.5">
           {reference.year && <span>{reference.year}</span>}
-          {reference.year && reference.industry && <span className="text-faint">·</span>}
-          {reference.industry && <span>{reference.industry}</span>}
-          {reference.agency && (
-            <>
-              <span className="text-faint">·</span>
-              <span>{reference.agency}</span>
-            </>
-          )}
-          <span className="text-faint ml-auto">Ler referência →</span>
+          {reference.year && <span>·</span>}
+          <span className="font-semibold" style={{ color: language.color }}>
+            {language.label}
+          </span>
         </div>
       </div>
     </Link>
   )
 }
 
-// ── Section header ─────────────────────────────────────────────────────────
+// ── Archive section ───────────────────────────────────────────────────────
 
-function SectionDivider({ count }: { count: number }) {
+function ArchiveSection({ references }: { references: Reference[] }) {
+  if (references.length === 0) return null
+
   return (
-    <div className="max-w-[1400px] mx-auto px-5 py-5 border-b border-border flex items-center justify-between">
-      <span className="text-2xs text-muted uppercase tracking-widest">Arquivo</span>
-      <span className="text-2xs text-faint">{count} {count === 1 ? 'referência' : 'referências'}</span>
-    </div>
-  )
-}
-
-// ── Reference grid ─────────────────────────────────────────────────────────
-
-function ReferenceGrid({ references }: { references: Reference[] }) {
-  return (
-    <div className="max-w-[1400px] mx-auto px-5 py-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-px bg-border">
-        {references.map((ref) => (
-          <div key={ref.id} className="bg-bg">
-            <ReferenceCard reference={ref} />
-          </div>
-        ))}
+    <section>
+      {/* Section header with inline filters */}
+      <div className="max-w-[1400px] mx-auto px-5 py-3 border-b border-border flex items-center justify-between gap-4 flex-wrap">
+        <span className="text-2xs text-muted uppercase tracking-widest shrink-0">
+          Arquivo —{' '}
+          {references.length}{' '}
+          {references.length === 1 ? 'referência' : 'referências'}
+        </span>
+        <Suspense fallback={null}>
+          <FilterBar />
+        </Suspense>
       </div>
-    </div>
+
+      {/* Grid */}
+      <div className="max-w-[1400px] mx-auto px-5 py-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-10">
+          {references.map((ref) => (
+            <ArchiveCard key={ref.id} reference={ref} />
+          ))}
+        </div>
+      </div>
+    </section>
   )
 }
 
-// ── Data + layout ─────────────────────────────────────────────────────────
+// ── Filter-only archive (when filters active) ─────────────────────────────
+
+function FilteredSection({ references }: { references: Reference[] }) {
+  return (
+    <section>
+      <div className="max-w-[1400px] mx-auto px-5 py-3 border-b border-border flex items-center justify-between gap-4 flex-wrap">
+        <span className="text-2xs text-muted uppercase tracking-widest shrink-0">
+          {references.length}{' '}
+          {references.length === 1 ? 'referência' : 'referências'}
+        </span>
+        <Suspense fallback={null}>
+          <FilterBar />
+        </Suspense>
+      </div>
+
+      {references.length === 0 ? (
+        <div className="max-w-[1400px] mx-auto px-5 py-20 text-center">
+          <p className="text-sm text-muted">Nenhuma referência encontrada.</p>
+        </div>
+      ) : (
+        <div className="max-w-[1400px] mx-auto px-5 py-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-10">
+            {references.map((ref) => (
+              <ArchiveCard key={ref.id} reference={ref} />
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
+// ── Data fetching ─────────────────────────────────────────────────────────
 
 async function ReferenceList({ searchParams }: { searchParams: SearchParams }) {
   const supabase = createClient()
@@ -139,38 +282,26 @@ async function ReferenceList({ searchParams }: { searchParams: SearchParams }) {
     )
   }
 
-  if (!references || references.length === 0) {
+  const refs = (references ?? []) as Reference[]
+
+  if (hasFilters) {
+    return <FilteredSection references={refs} />
+  }
+
+  if (refs.length === 0) {
     return (
       <div className="max-w-[1400px] mx-auto px-5 py-20 text-center">
-        <p className="text-sm text-muted">Nenhuma referência encontrada.</p>
+        <p className="text-sm text-muted">Nenhuma referência publicada ainda.</p>
       </div>
     )
   }
 
-  const refs = references as Reference[]
-
-  // With filters: plain grid
-  if (hasFilters) {
-    return (
-      <>
-        <SectionDivider count={refs.length} />
-        <ReferenceGrid references={refs} />
-      </>
-    )
-  }
-
-  // Magazine layout: hero + archive grid
   const [hero, ...rest] = refs
 
   return (
     <>
-      <HeroReference reference={hero} />
-      {rest.length > 0 && (
-        <>
-          <SectionDivider count={rest.length} />
-          <ReferenceGrid references={rest} />
-        </>
-      )}
+      <Hero reference={hero} />
+      <ArchiveSection references={rest} />
     </>
   )
 }
@@ -181,9 +312,6 @@ export default function HomePage({ searchParams }: { searchParams: SearchParams 
   return (
     <>
       <Header />
-      <Suspense>
-        <FilterBar />
-      </Suspense>
       <Suspense
         fallback={
           <div className="max-w-[1400px] mx-auto px-5 py-20 text-center text-muted text-sm">
